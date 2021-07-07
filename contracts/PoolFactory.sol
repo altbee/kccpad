@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -58,7 +60,6 @@ contract PoolFactory is Ownable, IPoolFactory {
      * @param fundToken          Address of fundToken: 0x000.000: KuCoin, Other KRC20
      */
     function createPool(
-        IERC20 saleToken,
         uint256 saleTarget,
         address fundToken,
         uint256 fundTarget,
@@ -68,7 +69,7 @@ contract PoolFactory is Ownable, IPoolFactory {
         uint256 allocationRatio,
         string memory meta
     ) external returns (address) {
-        Pool pool = new Pool(address(this), saleToken, saleTarget, fundToken, fundTarget);
+        Pool pool = new Pool(address(this), saleTarget, fundToken, fundTarget);
 
         pool.setBaseData(startTime, endTime, claimTime, allocationRatio, meta);
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -48,7 +50,7 @@ contract Pool is Ownable, ReentrancyGuard {
     uint256 public vestingDuration;
     uint256 public vestingPeriodicity;
 
-    event PoolInitialized(address saleToken, uint256 saleTarget, address fundToken, uint256 fundTarget);
+    event PoolInitialized(uint256 saleTarget, address fundToken, uint256 fundTarget);
 
     event PoolBaseDataInitialized(
         uint256 startTime,
@@ -59,6 +61,8 @@ contract Pool is Ownable, ReentrancyGuard {
     );
 
     event PoolTokenInfoChanged(uint256 saleTarget, uint256 fundTarget);
+
+    event SaleTokenAddressSet(address saleToken);
 
     event VestingSet(
         uint256 cliffTime,
@@ -73,18 +77,15 @@ contract Pool is Ownable, ReentrancyGuard {
 
     constructor(
         address _factory,
-        IERC20 _saleToken,
         uint256 _saleTarget,
         address _fundToken,
         uint256 _fundTarget
     ) {
         require(_factory != address(0), "Invalid factory address");
-        require(address(_saleToken) != address(0), "Invalid SaleToken address");
         require(_saleTarget > 0, "Sale Token target can't be zero!");
         require(_fundToken != address(0), "Invalid FundToken address");
         require(_fundTarget > 0, "Fund Token target can't be zero!");
 
-        saleToken = _saleToken;
         saleTarget = _saleTarget;
 
         fundToken = _fundToken;
@@ -92,7 +93,7 @@ contract Pool is Ownable, ReentrancyGuard {
 
         factory = _factory;
 
-        emit PoolInitialized(address(saleToken), saleTarget, fundToken, fundTarget);
+        emit PoolInitialized(saleTarget, fundToken, fundTarget);
     }
 
     function setBaseData(
@@ -147,6 +148,14 @@ contract Pool is Ownable, ReentrancyGuard {
         meta = _meta;
 
         emit PoolBaseDataInitialized(startTime, endTime, claimTime, meta, allocationRatio);
+    }
+
+    function setSaleToken(IERC20 _saleToken) external onlyOwner {
+        require(address(_saleToken) != address(0), "Invalid SaleToken!");
+        require(address(saleToken) == address(0), "SaleToken is already set!");
+
+        saleToken = _saleToken;
+        emit SaleTokenAddressSet(address(saleToken));
     }
 
     function setAllocationRatio(uint256 _allocationRatio) external onlyOwner {
