@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./interfaces/IPoolFactory.sol";
+import "./interfaces/IKCCConfig.sol";
 
 contract Pool is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -19,7 +20,7 @@ contract Pool is Ownable, ReentrancyGuard {
         uint256 released; // currently released token amount
     }
 
-    address public factory;
+    IPoolFactory public factory;
 
     IERC20 public saleToken;
     uint256 public saleTarget;
@@ -33,6 +34,7 @@ contract Pool is Ownable, ReentrancyGuard {
     // min allocation per wallet = allocationRatio * teamToken.balanceOf(user)
     // 2ether => 2
     uint256 public allocationRatio;
+    uint256 public maxAllocation;
 
     uint256 public startTime;
     uint256 public endTime;
@@ -52,12 +54,13 @@ contract Pool is Ownable, ReentrancyGuard {
 
     event PoolInitialized(uint256 saleTarget, address fundToken, uint256 fundTarget);
 
-    event PoolBaseDataInitialized(
+    event PoolBaseDataChanged(
         uint256 startTime,
         uint256 endTime,
         uint256 claimTime,
-        string meta,
-        uint256 allocationRatio
+        uint256 maxAllocation,
+        uint256 allocationRatio,
+        string meta
     );
 
     event PoolTokenInfoChanged(uint256 saleTarget, uint256 fundTarget);
@@ -76,12 +79,12 @@ contract Pool is Ownable, ReentrancyGuard {
     event PoolClaimed(address to, uint256 amount);
 
     constructor(
-        address _factory,
+        IPoolFactory _factory,
         uint256 _saleTarget,
         address _fundToken,
         uint256 _fundTarget
     ) {
-        require(_factory != address(0), "Invalid factory address");
+        require(address(_factory) != address(0), "Invalid factory address");
         require(_saleTarget > 0, "Sale Token target can't be zero!");
         require(_fundToken != address(0), "Invalid FundToken address");
         require(_fundTarget > 0, "Fund Token target can't be zero!");
@@ -100,22 +103,60 @@ contract Pool is Ownable, ReentrancyGuard {
         uint256 _startTime,
         uint256 _endTime,
         uint256 _claimTime,
+        uint256 _maxAllocation,
         uint256 _allocationRatio,
         string memory _meta
     ) external onlyOwner {
         require(_allocationRatio > 0, "AllocationRatio can't be zero!");
+        require(_maxAllocation > 0, "MaxAllocation can't be zero!");
 
         require(startTime > block.timestamp, "You can't set past time!");
         require(startTime < endTime, "EndTime can't be earlier than startTime");
         require(endTime < claimTime, "ClaimTime can't be earlier than endTime");
 
+        uint256 minAmount = getMinAllocation();
+        require(_maxAllocation > minAmount, "MaxAllocation should be greater than min allocation");
+
         startTime = _startTime;
         endTime = _endTime;
         claimTime = _claimTime;
+        maxAllocation = _maxAllocation;
         allocationRatio = _allocationRatio;
         meta = _meta;
 
-        emit PoolBaseDataInitialized(startTime, endTime, claimTime, meta, allocationRatio);
+        emit PoolBaseDataChanged(startTime, endTime, claimTime, maxAllocation, allocationRatio, meta);
+    }
+
+    function getFeeInfo() private view returns (address, uint256) {
+        IKCCConfig config = IKCCConfig(factory.config());
+        return (config.feeRecipient(), config.feePercent());
+    }
+
+    function canParticate(address user) public view returns (bool) {
+        IKCCConfig config = IKCCConfig(factory.config());
+        uint256 total = config.getAllInToken(user);
+
+        if (total >= config.baseAmount()) {
+            return true;
+        }
+        return false;
+    }
+
+    function getMinAllocation() public view returns (uint256) {
+        IKCCConfig config = IKCCConfig(factory.config());
+        return config.baseAmount() * allocationRatio;
+    }
+
+    function getMaxAllocation(address user) public view returns (uint256) {
+        IKCCConfig config = IKCCConfig(factory.config());
+        uint256 total = config.getAllInToken(user);
+
+        require(total >= config.baseAmount(), "You don't have enough 1STEP");
+
+        if (total * allocationRatio > maxAllocation) {
+            return maxAllocation;
+        }
+        return total * allocationRatio;
     }
 
     function setStartTime(uint256 _startTime) external onlyOwner {
@@ -123,7 +164,7 @@ contract Pool is Ownable, ReentrancyGuard {
 
         startTime = _startTime;
 
-        emit PoolBaseDataInitialized(startTime, endTime, claimTime, meta, allocationRatio);
+        emit PoolBaseDataChanged(startTime, endTime, claimTime, maxAllocation, allocationRatio, meta);
     }
 
     function setEndTime(uint256 _endTime) external onlyOwner {
@@ -132,7 +173,7 @@ contract Pool is Ownable, ReentrancyGuard {
 
         endTime = _endTime;
 
-        emit PoolBaseDataInitialized(startTime, endTime, claimTime, meta, allocationRatio);
+        emit PoolBaseDataChanged(startTime, endTime, claimTime, maxAllocation, allocationRatio, meta);
     }
 
     function setClaimTime(uint256 _claimTime) external onlyOwner {
@@ -141,13 +182,13 @@ contract Pool is Ownable, ReentrancyGuard {
 
         claimTime = _claimTime;
 
-        emit PoolBaseDataInitialized(startTime, endTime, claimTime, meta, allocationRatio);
+        emit PoolBaseDataChanged(startTime, endTime, claimTime, maxAllocation, allocationRatio, meta);
     }
 
     function setMeta(string memory _meta) external onlyOwner {
         meta = _meta;
 
-        emit PoolBaseDataInitialized(startTime, endTime, claimTime, meta, allocationRatio);
+        emit PoolBaseDataChanged(startTime, endTime, claimTime, maxAllocation, allocationRatio, meta);
     }
 
     function setSaleToken(IERC20 _saleToken) external onlyOwner {
@@ -164,7 +205,17 @@ contract Pool is Ownable, ReentrancyGuard {
 
         allocationRatio = _allocationRatio;
 
-        emit PoolBaseDataInitialized(startTime, endTime, claimTime, meta, allocationRatio);
+        emit PoolBaseDataChanged(startTime, endTime, claimTime, maxAllocation, allocationRatio, meta);
+    }
+
+    function setMaxAllocation(uint256 _maxAllocation) external onlyOwner {
+        require(_maxAllocation > 0, "Max Allocation can't be zero!");
+        uint256 minAmount = getMinAllocation();
+        require(_maxAllocation > minAmount, "MaxAllocation should be greater than min allocation");
+
+        maxAllocation = _maxAllocation;
+
+        emit PoolBaseDataChanged(startTime, endTime, claimTime, maxAllocation, allocationRatio, meta);
     }
 
     function setSaleTarget(uint256 _saleTarget) external onlyOwner {
@@ -213,7 +264,7 @@ contract Pool is Ownable, ReentrancyGuard {
 
         uint256 balance = address(this).balance;
 
-        (address feeRecipient, uint256 feePercent) = IPoolFactory(factory).getFeeInfo();
+        (address feeRecipient, uint256 feePercent) = getFeeInfo();
 
         uint256 fee = (balance * (feePercent)) / (1000);
         uint256 restAmount = balance - (fee);
@@ -228,7 +279,7 @@ contract Pool is Ownable, ReentrancyGuard {
 
         uint256 balance = IERC20(fundToken).balanceOf(address(this));
 
-        (address feeRecipient, uint256 feePercent) = IPoolFactory(factory).getFeeInfo();
+        (address feeRecipient, uint256 feePercent) = getFeeInfo();
 
         uint256 fee = (balance * feePercent) / 1000;
         uint256 restAmount = balance - fee;
@@ -291,16 +342,19 @@ contract Pool is Ownable, ReentrancyGuard {
         require(startTime != 0 && block.timestamp > startTime, "Pool has not yet started");
         require(endTime != 0 && block.timestamp < endTime, "Pool already ended");
 
-        (IERC20 baseToken, uint256 baseAmount) = IPoolFactory(factory).getBaseInfo();
+        uint256 max = getMaxAllocation(addr);
+        uint256 min = getMinAllocation();
 
-        uint256 baseTokenBalance = baseToken.balanceOf(addr);
-
-        require(baseTokenBalance >= baseAmount, "You don't have enough amount of Base Token");
         require(amount > 0, "Amount should be great than zero");
 
-        require(amount <= baseTokenBalance * allocationRatio, "Amount should be less than your max allocation!");
-
         require(fundRaised + amount <= fundTarget, "Target hit!");
+
+        uint256 personalTotal = amount + funders[addr].totalFunded;
+
+        require(personalTotal >= min, "Amount is too small");
+
+        require(personalTotal <= max, "Amount is too big");
+
         _;
     }
 
@@ -340,7 +394,12 @@ contract Pool is Ownable, ReentrancyGuard {
         emit PoolProgressChanged(msg.sender, amount, fundRaised, saleRaised);
     }
 
-    fallback() external payable {}
+    fallback() external payable {
+        revert("Something went wrong!");
+    }
 
-    receive() external payable {}
+    receive() external payable {
+        require(fundToken == address(0), "It's not a KUC-buy IDO!");
+        buyWithKuc();
+    }
 }

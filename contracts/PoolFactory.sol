@@ -2,56 +2,30 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "./Pool.sol";
 import "./interfaces/IPoolFactory.sol";
+import "./interfaces/IKCCConfig.sol";
 
 contract PoolFactory is Ownable, IPoolFactory {
     uint256 public poolsCount;
     address[] public pools;
     mapping(address => bool) public isPool;
 
-    // usds for launch holder participants
-    IERC20 public baseToken;
-    uint256 public baseAmount;
+    address public override config;
 
-    // fee
-    address public feeRecipient;
-    uint256 public feePercent; // 10: 1%, 15: 1.5%
+    constructor(IKCCConfig _config) {
+        require(address(_config) != address(0), "Invalid config address");
 
-    constructor(
-        IERC20 _baseToken,
-        uint256 _baseAmount,
-        address _feeRecipient,
-        uint256 _feePercent
-    ) {
-        baseToken = _baseToken;
-        baseAmount = _baseAmount;
-        feePercent = _feePercent;
-        feeRecipient = _feeRecipient;
+        config = address(_config);
     }
 
-    function updateFeeInfo(address _feeRecipient, uint256 _feePercent) external onlyOwner {
-        feePercent = _feePercent;
-        feeRecipient = _feeRecipient;
-    }
-
-    function updateBaseInfo(IERC20 _baseToken, uint256 _baseAmount) external onlyOwner {
-        require(_baseAmount > 0, "BaseAmount should be greater than 0!");
-        baseToken = _baseToken;
-        baseAmount = _baseAmount;
-    }
-
-    function getFeeInfo() external view override returns (address, uint256) {
-        return (feeRecipient, feePercent);
-    }
-
-    function getBaseInfo() external view override returns (IERC20, uint256) {
-        return (baseToken, baseAmount);
+    function setConfigAddress(IKCCConfig _config) external onlyOwner {
+        require(address(_config) != address(0), "Invalid config address");
+        config = address(_config);
     }
 
     /*
@@ -66,12 +40,13 @@ contract PoolFactory is Ownable, IPoolFactory {
         uint256 startTime,
         uint256 endTime,
         uint256 claimTime,
+        uint256 maxAllocation,
         uint256 allocationRatio,
         string memory meta
     ) external returns (address) {
-        Pool pool = new Pool(address(this), saleTarget, fundToken, fundTarget);
+        Pool pool = new Pool(this, saleTarget, fundToken, fundTarget);
 
-        pool.setBaseData(startTime, endTime, claimTime, allocationRatio, meta);
+        pool.setBaseData(startTime, endTime, claimTime, maxAllocation, allocationRatio, meta);
 
         pools.push(address(pool));
         isPool[address(pool)] = true;

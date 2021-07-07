@@ -71,8 +71,8 @@ const config: HardhatUserConfig = {
         mnemonic,
       },
       forking: {
-        url: "https://eth-mainnet.alchemyapi.io/v2/BCNbfMg2LzXngd0f-2g0oZzSYiamJko9",
-        blockNumber: 12148212,
+        url: "https://rpc-mainnet.kcc.network",
+        blockNumber: 1039320,
       },
       chainId: chainIds.mainnet,
     },
