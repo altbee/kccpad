@@ -160,7 +160,7 @@ contract Staking is Ownable, ReentrancyGuard, IStaking {
         uint256 pending = (user.amount * (pool.accTokenPerShare)) / (1e12) - (user.rewardDebt);
         if (pending > 0 || user.pendingRewards > 0) {
             user.pendingRewards = user.pendingRewards + (pending);
-            uint256 claimedAmount = safeTokenTrantokenr(msg.sender, user.pendingRewards, pid);
+            uint256 claimedAmount = safeTokenTransfer(msg.sender, user.pendingRewards, pid);
             emit Claim(msg.sender, pid, claimedAmount);
             user.pendingRewards = user.pendingRewards - (claimedAmount);
             user.lastClaim = block.timestamp;
@@ -169,7 +169,7 @@ contract Staking is Ownable, ReentrancyGuard, IStaking {
         user.rewardDebt = (user.amount * (pool.accTokenPerShare)) / (1e12);
     }
 
-    function safeTokenTrantokenr(
+    function safeTokenTransfer(
         address to,
         uint256 amount,
         uint256 pid

@@ -68,10 +68,6 @@ contract TokenLocker is Ownable, ReentrancyGuard {
         return lockIds[beneficiary];
     }
 
-    function getTotalLock() external view returns (uint256) {
-        return lockInfos.length;
-    }
-
     function _releaseFromLockId(uint256 lockId, address beneficiary) private nonReentrant {
         require(lockInfos.length > lockId, "Invalid lockId");
         require(beneficiary != address(0), "Invalid beneficiary address");
@@ -101,9 +97,10 @@ contract TokenLocker is Ownable, ReentrancyGuard {
             uint256 lockId = lockIds[beneficiary][index];
             uint256 subAvailable = getAvailableAmount(lockId);
             if (subAvailable > 0) {
-                lockInfos[lockId].token.transfer(beneficiary, subAvailable);
+                
                 available = available + (subAvailable);
                 lockInfos[lockId].released = lockInfos[lockId].released + (subAvailable);
+                lockInfos[lockId].token.transfer(beneficiary, subAvailable);
                 emit TokenReleased(address(lockInfos[lockId].token), beneficiary, subAvailable, lockId);
             }
         }

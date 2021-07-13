@@ -26,6 +26,8 @@ const chainIds = {
   ropsten: 3,
   bsc: 56,
   bsct: 97,
+  kccmain: 321,
+  kcctest: 322,
 };
 
 // Ensure that we have all the environment variables we need.
@@ -72,9 +74,9 @@ const config: HardhatUserConfig = {
       },
       forking: {
         url: "https://rpc-mainnet.kcc.network",
-        blockNumber: 1039320,
+        // blockNumber: 939320,
       },
-      chainId: chainIds.mainnet,
+      chainId: chainIds.kccmain,
     },
     bsc: {
       accounts: {
@@ -89,6 +91,20 @@ const config: HardhatUserConfig = {
       },
       url: "https://data-seed-prebsc-1-s1.binance.org:8545",
       chainId: chainIds.bsct,
+    },
+    kccmain: {
+      accounts: {
+        mnemonic,
+      },
+      url: "https://rpc-mainnet.kcc.network",
+      chainId: chainIds.kccmain,
+    },
+    kcctest: {
+      accounts: {
+        mnemonic,
+      },
+      url: "https://rpc-testnet.kcc.network",
+      chainId: chainIds.kcctest,
     },
     goerli: createTestnetConfig("goerli"),
     kovan: createTestnetConfig("kovan"),

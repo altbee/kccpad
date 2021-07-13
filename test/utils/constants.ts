@@ -16,6 +16,8 @@ export const ONE_DAY_IN_SECONDS = BigNumber.from(60 * 60 * 24);
 export const ONE_HOUR_IN_SECONDS = BigNumber.from(60 * 60);
 export const ONE_YEAR_IN_SECONDS = BigNumber.from(31557600);
 
+export const ONE_DAY_SECONDS = 60 * 60 * 24;
+
 export const PRECISE_UNIT = constants.WeiPerEther;
 export const ETH_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
